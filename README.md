@@ -2,7 +2,7 @@ This project is under construction.
 
 This Database project somehow will look like this
 
-
+```
 simpledb/
 ├── main.py                         
 ├── config.py                       
@@ -33,7 +33,7 @@ simpledb/
 │   └── helpers.py                  # Helping commands
 └── tests/
     └── test                        # Some Testing files
-
+```
 
 
 Phase 1: (Currently here)
