@@ -71,4 +71,107 @@ class Parser:
     - DELETE
     - BEGIN/COMMIT/ROLLBACK
     """
-  
+    
+    def __init__(self):
+        self.tokenizer = Tokenizer()
+        self.current_tokens = []
+        self.current_index = 0
+    
+    def parse(self, sql: str) -> Command:
+        tokens = self.tokenizer.tokenize(sql)
+        self.current_tokens = tokens
+        self.current_index = 0
+        
+        if not tokens:
+            raise SyntaxError("Empty SQL statement")
+        
+        command = self._parse_command()
+        
+        # Check for trailing tokens
+        if self.current_index < len(tokens):
+            raise SyntaxError(f"Unexpected tokens after command: {tokens[self.current_index:]}")
+        
+        return command
+    
+    def _parse_command(self) -> Command:
+        """Parse the main command based on the first keyword."""
+        if self.current_index >= len(self.current_tokens):
+            raise SyntaxError("Unexpected end of statement")
+        
+        token = self.current_tokens[self.current_index]
+        
+        if token.type != "KEYWORD":
+            raise SyntaxError(f"Expected keyword, got {token.type}")
+        
+        if token.value == "CREATE":
+            return self._parse_create_table()
+        elif token.value == "INSERT":
+            return self._parse_insert()
+        elif token.value == "SELECT":
+            return self._parse_select()
+        elif token.value == "UPDATE":
+            return self._parse_update()
+        elif token.value == "DELETE":
+            return self._parse_delete()
+        elif token.value in ("BEGIN", "COMMIT", "ROLLBACK"):
+            return self._parse_transaction()
+        else:
+            raise SyntaxError(f"Unsupported command: {token.value}")
+    
+    def _parse_create_table(self) -> CreateTableCommand:
+        """Parse CREATE TABLE statement."""
+        # CREATE TABLE table_name (column_definitions)
+        self._expect_keyword("CREATE")
+        self._expect_keyword("TABLE")
+        
+        table_name = self._expect_identifier()
+        self._expect_punctuation("(")
+        
+        columns = []
+        while self.current_index < len(self.current_tokens):
+            column_def = self._parse_column_definition()
+            columns.append(column_def)
+            
+            if self._peek_punctuation() == ")":
+                break
+            
+            self._expect_punctuation(",")
+        
+        self._expect_punctuation(")")
+        
+        return CreateTableCommand(table_name, columns)
+    
+    def _parse_column_definition(self) -> Dict[str, Any]:
+        """Parse a column definition in CREATE TABLE."""
+        column_name = self._expect_identifier()
+        data_type = self._expect_identifier()
+        
+        column_def = {
+            "name": column_name,
+            "type": data_type,
+            "nullable": True,
+            "primary_key": False
+        }
+        
+        # Parse additional constraints
+        while self.current_index < len(self.current_tokens):
+            token = self._peek_token()
+            if token.type == "PUNCTUATION" and token.value in (",", ")"):
+                break
+            
+            if token.type == "KEYWORD":
+                if token.value == "NOT":
+                    self._advance()
+                    self._expect_keyword("NULL")
+                    column_def["nullable"] = False
+                elif token.value == "PRIMARY":
+                    self._advance()
+                    self._expect_keyword("KEY")
+                    column_def["primary_key"] = True
+                else:
+                    break
+            else:
+                break
+        
+        return column_def
+    
