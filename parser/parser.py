@@ -175,3 +175,81 @@ class Parser:
         
         return column_def
     
+    def _parse_insert(self) -> InsertCommand:
+        """Parse INSERT INTO statement."""
+        # INSERT INTO table_name (columns) VALUES (values)
+        self._expect_keyword("INSERT")
+        self._expect_keyword("INTO")
+        
+        table_name = self._expect_identifier()
+        
+        # Parse column list (optional)
+        columns = []
+        if self._peek_punctuation() == "(":
+            self._advance()
+            while self.current_index < len(self.current_tokens):
+                columns.append(self._expect_identifier())
+                if self._peek_punctuation() == ")":
+                    break
+                self._expect_punctuation(",")
+            self._expect_punctuation(")")
+        
+        self._expect_keyword("VALUES")
+        
+        # Parse values
+        values = []
+        while self.current_index < len(self.current_tokens):
+            self._expect_punctuation("(")
+            row_values = []
+            while self.current_index < len(self.current_tokens):
+                value = self._parse_value()
+                row_values.append(value)
+                if self._peek_punctuation() == ")":
+                    break
+                self._expect_punctuation(",")
+            self._expect_punctuation(")")
+            values.append(row_values)
+            
+            if self._peek_punctuation() != "(":
+                break
+            self._expect_punctuation(",")
+        
+        return InsertCommand(table_name, columns, values)
+    
+    def _parse_select(self) -> SelectCommand:
+        """Parse SELECT statement."""
+        # SELECT columns FROM table_name [WHERE condition] [ORDER BY] [LIMIT]
+        self._expect_keyword("SELECT")
+        
+        # Parse column list
+        columns = []
+        if self._peek_token().value == "*":
+            self._advance()
+            columns = ["*"]
+        else:
+            while self.current_index < len(self.current_tokens):
+                columns.append(self._expect_identifier())
+                if self._peek_punctuation() != ",":
+                    break
+                self._advance()
+        
+        self._expect_keyword("FROM")
+        table_name = self._expect_identifier()
+        
+        # Parse WHERE clause
+        where_clause = None
+        if self._peek_keyword() == "WHERE":
+            where_clause = self._parse_where_clause()
+        
+        # Parse ORDER BY
+        order_by = None
+        if self._peek_keyword() == "ORDER":
+            order_by = self._parse_order_by()
+        
+        # Parse LIMIT
+        limit = None
+        if self._peek_keyword() == "LIMIT":
+            limit = self._parse_limit()
+        
+        return SelectCommand(columns, table_name, where_clause, order_by, limit)
+    
